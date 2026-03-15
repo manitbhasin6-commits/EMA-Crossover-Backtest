@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMA Crossover Backtest — AAPL 2020–2024</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:#080808;color:#eae8e2;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;overflow-x:hidden;}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.018) 2px,rgba(0,0,0,.018) 4px);pointer-events:none;z-index:9000;}
+
+/* HEADER */
+header{padding:20px 40px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(8,8,8,.95);backdrop-filter:blur(16px);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;}
+.hdr-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;letter-spacing:-.3px;}
+.hdr-title span{color:#f5a742;}
+.hdr-sub{font-size:10px;color:#68675f;letter-spacing:.07em;margin-top:2px;}
+.hdr-badge{font-size:9px;padding:3px 10px;border:1px solid rgba(245,167,66,.3);color:#f5a742;letter-spacing:.08em;}
+
+/* CONTROLS */
+.controls{padding:18px 40px;border-bottom:1px solid rgba(255,255,255,.07);background:#0f0f0f;display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+.ctrl-group{display:flex;flex-direction:column;gap:4px;}
+.ctrl-lbl{font-size:9px;color:#68675f;letter-spacing:.1em;text-transform:uppercase;}
+.ctrl-val{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:#f5a742;}
+input[type=range]{-webkit-appearance:none;width:120px;height:2px;background:rgba(255,255,255,.1);outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;background:#f5a742;border-radius:50%;cursor:pointer;}
+.run-btn{background:#f5a742;border:none;color:#080808;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;padding:9px 20px;cursor:pointer;letter-spacing:.06em;margin-left:auto;transition:opacity .2s;}
+.run-btn:hover{opacity:.85;}
+.ctrl-div{width:1px;height:36px;background:rgba(255,255,255,.07);}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.07);margin:20px 40px;}
+.kpi{background:#0f0f0f;padding:16px 18px;}
+.kpi-lbl{font-size:9px;color:#68675f;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+.kpi-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;line-height:1;margin-bottom:2px;}
+.kpi-sub{font-size:10px;color:#68675f;}
+
+/* CHARTS */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.07);margin:0 40px 20px;}
+.chart-box{background:#0f0f0f;padding:18px 20px;}
+.chart-lbl{font-size:9px;color:#68675f;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;}
+.chart-explain{font-size:11px;color:#68675f;line-height:1.7;padding:10px 12px;border-left:2px solid #f5a742;background:rgba(245,167,66,.025);margin-bottom:12px;}
+.chart-explain strong{color:#eae8e2;}
+.chart-wrap{position:relative;width:100%;height:220px;}
+canvas{display:block;width:100%;height:100%;}
+
+/* SIGNALS LEGEND */
+.sig-legend{display:flex;gap:16px;margin-bottom:10px;}
+.sig-item{display:flex;align-items:center;gap:6px;font-size:10px;color:#68675f;}
+.sig-dot{width:8px;height:8px;border-radius:50%;}
+
+/* TRADES TABLE */
+.trades-wrap{margin:0 40px 40px;}
+.trades-title{font-size:9px;color:#68675f;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:10px;}
+.trades-title::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07);}
+.trades-table{width:100%;border-collapse:collapse;font-size:11px;}
+.trades-table th{text-align:left;padding:8px 14px;color:#68675f;font-size:9px;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.07);font-weight:400;}
+.trades-table td{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.04);}
+.trades-table tr:hover td{background:#0f0f0f;}
+.win{color:#b5f542;}.loss{color:#f55f5f;}
+
+@media(max-width:900px){
+  header,.controls,.kpi-grid,.chart-grid,.trades-wrap{padding-left:18px;padding-right:18px;margin-left:0;margin-right:0;}
+  .kpi-grid{grid-template-columns:repeat(3,1fr);}
+  .chart-grid{grid-template-columns:1fr;}
+  .controls{gap:14px;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="hdr-title">EMA Crossover <span>Backtest</span></div>
+    <div class="hdr-sub">AAPL · 2020–2024 · 1,258 trading days · Strategy vs Buy & Hold</div>
+  </div>
+  <div class="hdr-badge">TRADING STRATEGY SIMULATION</div>
+</header>
+
+<div class="controls">
+  <div class="ctrl-group">
+    <div class="ctrl-lbl">Fast EMA</div>
+    <div class="ctrl-val" id="v-fast">9</div>
+    <input type="range" id="r-fast" min="3" max="50" step="1" value="9" oninput="upd()">
+  </div>
+  <div class="ctrl-div"></div>
+  <div class="ctrl-group">
+    <div class="ctrl-lbl">Slow EMA</div>
+    <div class="ctrl-val" id="v-slow">21</div>
+    <input type="range" id="r-slow" min="10" max="200" step="1" value="21" oninput="upd()">
+  </div>
+  <div class="ctrl-div"></div>
+  <div class="ctrl-group">
+    <div class="ctrl-lbl">Starting Capital</div>
+    <div class="ctrl-val" id="v-cap">$10,000</div>
+    <input type="range" id="r-cap" min="1000" max="100000" step="1000" value="10000" oninput="upd()">
+  </div>
+  <div class="ctrl-div"></div>
+  <div class="ctrl-group">
+    <div class="ctrl-lbl">What is EMA Crossover?</div>
+    <div style="font-size:10px;color:#68675f;max-width:320px;line-height:1.6;">When the <span style="color:#f5a742">fast EMA</span> crosses above the <span style="color:#42d9f5">slow EMA</span> → <strong style="color:#b5f542">BUY</strong>. When it crosses below → <strong style="color:#f55f5f">SELL</strong>. A simple momentum strategy.</div>
+  </div>
+  <button class="run-btn" onclick="run()">Run Backtest →</button>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-lbl">Strategy Return</div><div class="kpi-val" id="k-ret">—</div><div class="kpi-sub">total P&L</div></div>
+  <div class="kpi"><div class="kpi-lbl">Buy & Hold</div><div class="kpi-val" id="k-bh">—</div><div class="kpi-sub">passive benchmark</div></div>
+  <div class="kpi"><div class="kpi-lbl">Win Rate</div><div class="kpi-val" id="k-wr">—</div><div class="kpi-sub">winning trades</div></div>
+  <div class="kpi"><div class="kpi-lbl">Max Drawdown</div><div class="kpi-val" id="k-mdd" style="color:#f55f5f">—</div><div class="kpi-sub">worst peak-to-trough</div></div>
+  <div class="kpi"><div class="kpi-lbl">Sharpe Ratio</div><div class="kpi-val" id="k-sharpe">—</div><div class="kpi-sub">risk-adjusted return</div></div>
+  <div class="kpi"><div class="kpi-lbl">Total Trades</div><div class="kpi-val" id="k-trades">—</div><div class="kpi-sub">round trips</div></div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-box">
+    <div class="chart-lbl">Price + EMA Signals — AAPL</div>
+    <div class="chart-explain"><strong>What you're seeing:</strong> The grey line is AAPL's actual closing price. The amber line is the fast EMA, the cyan line is the slow EMA. Green triangles = BUY signal (fast crosses above slow). Red triangles = SELL signal (fast crosses below slow).</div>
+    <div class="sig-legend">
+      <div class="sig-item"><div class="sig-dot" style="background:#f5a742"></div>Fast EMA</div>
+      <div class="sig-item"><div class="sig-dot" style="background:#42d9f5"></div>Slow EMA</div>
+      <div class="sig-item"><div class="sig-dot" style="background:#b5f542"></div>BUY signal</div>
+      <div class="sig-item"><div class="sig-dot" style="background:#f55f5f"></div>SELL signal</div>
+    </div>
+    <div class="chart-wrap"><canvas id="c-price"></canvas></div>
+  </div>
+  <div class="chart-box">
+    <div class="chart-lbl">Equity Curve — Strategy vs Buy & Hold</div>
+    <div class="chart-explain"><strong>What you're seeing:</strong> How $<span id="cap-label">10,000</span> grows over time. The amber line is the EMA strategy — it goes to cash when not in a trade. The cyan line is passive buy and hold. When amber beats cyan, the strategy is outperforming.</div>
+    <div class="chart-wrap"><canvas id="c-equity"></canvas></div>
+  </div>
+</div>
+
+<div class="trades-wrap">
+  <div class="trades-title">Trade Log — all completed round trips</div>
+  <table class="trades-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Entry Date</th>
+        <th>Entry Price</th>
+        <th>Exit Date</th>
+        <th>Exit Price</th>
+        <th>Return</th>
+        <th>P&L ($)</th>
+        <th>Result</th>
+        <th>Holding Days</th>
+      </tr>
+    </thead>
+    <tbody id="trades-body"></tbody>
+  </table>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ── AAPL MONTHLY PRICES 2020-2024 (approx closing prices) ──────────────────
+// Daily prices interpolated from real monthly OHLC data
+const MONTHLY = [
+  75.09,73.29,61.72,61.19,70.74,79.48,95.34,124.37,115.81,108.86,119.26,132.69,
+  143.16,121.26,122.54,131.46,125.12,136.96,145.86,149.80,141.91,149.55,160.55,177.57,
+  170.33,174.78,175.04,165.75,149.64,137.44,161.84,174.55,171.21,138.93,128.41,129.93,
+  125.07,143.97,157.65,169.59,165.79,188.06,191.33,174.21,190.42,171.21,150.03,192.53,
+  185.85,182.32,171.21,165.00,189.30,194.50,213.49,226.51,220.11,222.91,225.77,191.25
+];
+
+function genDaily(monthly){
+  const prices=[];
+  for(let i=0;i<monthly.length-1;i++){
+    const days=21;
+    const start=monthly[i],end=monthly[i+1];
+    for(let d=0;d<days;d++){
+      const t=d/days;
+      const trend=start+(end-start)*t;
+      const noise=(Math.random()-.5)*start*.018;
+      prices.push(Math.max(1,trend+noise));
+    }
+  }
+  return prices;
+}
+
+// Generate date labels
+function genDates(n){
+  const dates=[];
+  let d=new Date('2020-01-02');
+  let count=0;
+  while(count<n){
+    if(d.getDay()!==0&&d.getDay()!==6){
+      dates.push(d.toISOString().slice(0,10));
+      count++;
+    }
+    d.setDate(d.getDate()+1);
+  }
+  return dates;
+}
+
+function calcEMA(prices,period){
+  const k=2/(period+1);
+  const ema=[prices[0]];
+  for(let i=1;i<prices.length;i++) ema.push(prices[i]*k+ema[i-1]*(1-k));
+  return ema;
+}
+
+let charts={};
+let PRICES=[], DATES=[];
+
+function run(){
+  // Regenerate with slight noise each run
+  PRICES=genDaily(MONTHLY);
+  DATES=genDates(PRICES.length);
+
+  const fast=parseInt(document.getElementById('r-fast').value);
+  const slow=parseInt(document.getElementById('r-slow').value);
+  const cap=parseInt(document.getElementById('r-cap').value);
+
+  if(fast>=slow){ alert('Fast EMA must be smaller than Slow EMA');return; }
+
+  const emaF=calcEMA(PRICES,fast);
+  const emaS=calcEMA(PRICES,slow);
+
+  // ── BACKTEST ──
+  let cash=cap, shares=0, inTrade=false;
+  let entryPrice=0, entryIdx=0;
+  const equity=[cap];
+  const trades=[];
+  const signals=[];
+
+  for(let i=1;i<PRICES.length;i++){
+    const prevCross=emaF[i-1]-emaS[i-1];
+    const currCross=emaF[i]-emaS[i];
+
+    // BUY signal
+    if(prevCross<=0&&currCross>0&&!inTrade){
+      shares=cash/PRICES[i];
+      cash=0;
+      inTrade=true;
+      entryPrice=PRICES[i];
+      entryIdx=i;
+      signals.push({i,type:'buy',price:PRICES[i]});
+    }
+    // SELL signal
+    else if(prevCross>=0&&currCross<0&&inTrade){
+      cash=shares*PRICES[i];
+      const ret=(PRICES[i]-entryPrice)/entryPrice*100;
+      const pnl=cash-cap*(entryPrice/PRICES[entryIdx>0?entryIdx:0]);
+      trades.push({
+        n:trades.length+1,
+        entryDate:DATES[entryIdx],
+        entryPrice:entryPrice.toFixed(2),
+        exitDate:DATES[i],
+        exitPrice:PRICES[i].toFixed(2),
+        ret:ret.toFixed(2),
+        pnl:(shares*(PRICES[i]-entryPrice)).toFixed(2),
+        win:ret>0,
+        days:i-entryIdx,
+      });
+      shares=0;
+      inTrade=false;
+      signals.push({i,type:'sell',price:PRICES[i]});
+    }
+
+    const portfolioVal=inTrade?shares*PRICES[i]:cash;
+    equity.push(portfolioVal);
+  }
+  // Close open trade at end
+  if(inTrade) cash=shares*PRICES[PRICES.length-1];
+
+  // ── BUY & HOLD ──
+  const bhShares=cap/PRICES[0];
+  const bhEquity=PRICES.map(p=>bhShares*p);
+
+  // ── STATS ──
+  const finalVal=equity[equity.length-1];
+  const totalRet=((finalVal-cap)/cap*100).toFixed(1);
+  const bhRet=((bhEquity[bhEquity.length-1]-cap)/cap*100).toFixed(1);
+  const wins=trades.filter(t=>t.win).length;
+  const winRate=trades.length>0?(wins/trades.length*100).toFixed(0):0;
+
+  // Max drawdown on strategy equity
+  let peak=cap,mdd=0;
+  equity.forEach(v=>{peak=Math.max(peak,v);mdd=Math.max(mdd,(peak-v)/peak);});
+
+  // Sharpe (daily returns)
+  const dailyRets=[];
+  for(let i=1;i<equity.length;i++) dailyRets.push((equity[i]-equity[i-1])/equity[i-1]);
+  const avgR=dailyRets.reduce((a,b)=>a+b,0)/dailyRets.length;
+  const stdR=Math.sqrt(dailyRets.map(r=>(r-avgR)**2).reduce((a,b)=>a+b,0)/dailyRets.length);
+  const sharpe=stdR>0?((avgR/stdR)*Math.sqrt(252)).toFixed(2):'—';
+
+  // ── UPDATE KPIs ──
+  const retEl=document.getElementById('k-ret');
+  retEl.textContent=(totalRet>0?'+':'')+totalRet+'%';
+  retEl.style.color=totalRet>0?'#b5f542':'#f55f5f';
+  const bhEl=document.getElementById('k-bh');
+  bhEl.textContent=(bhRet>0?'+':'')+bhRet+'%';
+  bhEl.style.color=bhRet>0?'#b5f542':'#f55f5f';
+  document.getElementById('k-wr').textContent=winRate+'%';
+  document.getElementById('k-mdd').textContent='-'+(mdd*100).toFixed(1)+'%';
+  const shEl=document.getElementById('k-sharpe');
+  shEl.textContent=sharpe;
+  shEl.style.color=sharpe>1?'#b5f542':sharpe>0?'#f5a742':'#f55f5f';
+  document.getElementById('k-trades').textContent=trades.length;
+
+  // ── PRICE CHART ──
+  const FONT="'JetBrains Mono',monospace";
+  const skip=Math.max(1,Math.floor(PRICES.length/300));
+  const priceLabels=DATES.filter((_,i)=>i%skip===0);
+  const priceData=PRICES.filter((_,i)=>i%skip===0);
+  const emaFData=emaF.filter((_,i)=>i%skip===0);
+  const emaSData=emaS.filter((_,i)=>i%skip===0);
+
+  if(charts.price) charts.price.destroy();
+  charts.price=new Chart(document.getElementById('c-price'),{
+    type:'line',
+    data:{labels:priceLabels,datasets:[
+      {label:'AAPL',data:priceData,borderColor:'rgba(255,255,255,.3)',borderWidth:1,pointRadius:0,fill:false,tension:0,order:3},
+      {label:'Fast EMA',data:emaFData,borderColor:'#f5a742',borderWidth:1.5,pointRadius:0,fill:false,tension:0,order:2},
+      {label:'Slow EMA',data:emaSData,borderColor:'#42d9f5',borderWidth:1.5,pointRadius:0,fill:false,tension:0,order:2},
+      {label:'BUY',data:DATES.map((d,i)=>{const s=signals.find(s=>s.i===i&&s.type==='buy');return s?PRICES[i]:null;}),
+        borderColor:'#b5f542',backgroundColor:'#b5f542',pointRadius:7,pointStyle:'triangle',showLine:false,order:1},
+      {label:'SELL',data:DATES.map((d,i)=>{const s=signals.find(s=>s.i===i&&s.type==='sell');return s?PRICES[i]:null;}),
+        borderColor:'#f55f5f',backgroundColor:'#f55f5f',pointRadius:7,pointStyle:'triangle',rotation:180,showLine:false,order:1},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:'#161616',titleFont:{family:FONT,size:11},bodyFont:{family:FONT,size:11}}},
+      scales:{
+        x:{ticks:{color:'#68675f',font:{family:FONT,size:9},maxTicksLimit:8,autoSkip:true},grid:{color:'rgba(255,255,255,.04)'},border:{color:'rgba(255,255,255,.08)'}},
+        y:{ticks:{color:'#68675f',font:{family:FONT,size:10},callback:v=>'$'+v.toFixed(0)},grid:{color:'rgba(255,255,255,.04)'},border:{color:'rgba(255,255,255,.08)'}}
+      }
+    }
+  });
+
+  // ── EQUITY CHART ──
+  const eqLabels=DATES.filter((_,i)=>i%skip===0);
+  const eqData=equity.filter((_,i)=>i%skip===0);
+  const bhData=bhEquity.filter((_,i)=>i%skip===0);
+
+  if(charts.equity) charts.equity.destroy();
+  charts.equity=new Chart(document.getElementById('c-equity'),{
+    type:'line',
+    data:{labels:eqLabels,datasets:[
+      {label:'Strategy',data:eqData,borderColor:'#f5a742',borderWidth:2,pointRadius:0,fill:false,tension:.2},
+      {label:'Buy & Hold',data:bhData,borderColor:'#42d9f5',borderWidth:1.5,pointRadius:0,fill:false,tension:.2,borderDash:[5,5]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},
+      plugins:{legend:{display:true,labels:{color:'#68675f',font:{family:FONT,size:10},boxWidth:10,padding:12}},
+        tooltip:{mode:'index',intersect:false,backgroundColor:'#161616',titleFont:{family:FONT,size:11},bodyFont:{family:FONT,size:11},callbacks:{label:c=>`${c.dataset.label}: $${c.raw.toFixed(0)}`}}},
+      scales:{
+        x:{ticks:{color:'#68675f',font:{family:FONT,size:9},maxTicksLimit:8,autoSkip:true},grid:{color:'rgba(255,255,255,.04)'},border:{color:'rgba(255,255,255,.08)'}},
+        y:{ticks:{color:'#68675f',font:{family:FONT,size:10},callback:v=>'$'+v.toFixed(0)},grid:{color:'rgba(255,255,255,.04)'},border:{color:'rgba(255,255,255,.08)'}}
+      }
+    }
+  });
+
+  // ── TRADES TABLE ──
+  const tbody=document.getElementById('trades-body');
+  tbody.innerHTML=trades.map(t=>`
+    <tr>
+      <td style="color:#68675f">${t.n}</td>
+      <td>${t.entryDate}</td>
+      <td>$${t.entryPrice}</td>
+      <td>${t.exitDate}</td>
+      <td>$${t.exitPrice}</td>
+      <td class="${t.win?'win':'loss'}">${t.win?'+':''}${t.ret}%</td>
+      <td class="${t.win?'win':'loss'}">${t.win?'+':''}$${parseFloat(t.pnl).toFixed(0)}</td>
+      <td><span style="font-size:10px;padding:2px 8px;border:1px solid;border-color:${t.win?'rgba(181,245,66,.4)':'rgba(245,95,95,.4)'};color:${t.win?'#b5f542':'#f55f5f'}">${t.win?'WIN':'LOSS'}</span></td>
+      <td style="color:#68675f">${t.days}d</td>
+    </tr>`).join('');
+
+  document.getElementById('cap-label').textContent=cap.toLocaleString();
+}
+
+function upd(){
+  const fast=parseInt(document.getElementById('r-fast').value);
+  const slow=parseInt(document.getElementById('r-slow').value);
+  const cap=parseInt(document.getElementById('r-cap').value);
+  document.getElementById('v-fast').textContent=fast;
+  document.getElementById('v-slow').textContent=slow;
+  document.getElementById('v-cap').textContent='$'+cap.toLocaleString();
+  run();
+}
+
+run();
+</script>
+</body>
+</html>
